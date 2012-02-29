@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
 
@@ -58,19 +59,19 @@ struct square {
 
 struct map { 
 	uint16_t start_id; 
-	uint8_t start_dir; 
 //	uint16_t current; // node at top of heap
 	uint16_t end_id; 
 	uint16_t n_heap; // current number of nodes in heap 
 	uint16_t n_tbl;  // current number of nodes in hash table
 	struct square *m; // maze 
+	uint8_t start_dir; 
 };
 
 void pop(struct node **heap, struct node **tbl, struct map *trip);
-uint16_t time_straight(uint16_t n, struct node *p, struct node nbhrs[n-1]);
+uint16_t time_straight(uint16_t n, struct node *p, struct node nb);
 uint16_t just_ahead(uint16_t id, uint8_t dir);
 struct node* turn90(uint16_t id, uint8_t dir);
-_Bool node_at(uint16_t id);
+bool node_at(uint16_t id, struct square *m);
 void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip);
 
 struct node* hash(struct node nb, uint16_t end_id, struct node **tbl);
@@ -82,6 +83,6 @@ uint16_t parent(uint16_t c);
 uint16_t child(uint16_t p);
 
 //uint16_t* trace_back(uint16_t *path, struct node **tbl, struct map *trip);
-uint16_t* fastest_path(struct map *trip);
+struct node** fastest_path(struct map *trip);
 
 #endif 

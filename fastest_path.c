@@ -31,7 +31,7 @@ void pop(struct node **heap, struct node **tbl, struct map *trip) {
 	heap[c_min] = heap[trip->n_heap--];
 	return;
 }
-uint16_t time_straight(uint16_t n, struct node *p, struct node nbhrs[n-1]) {
+uint16_t time_straight(uint16_t n, struct node *p, struct node nb) {
 	// may use p, nbhrs[n-1] to ask if diagonal and vary time cost 
 	return (1  + (2 * n)); // const. penalty at beginning? nonlinear?
 }
@@ -41,7 +41,7 @@ uint16_t just_ahead(uint16_t id, uint8_t dir) {
 	if (id > 2*N*(N-1)) 
 		return id;
 
-	_Bool vertical = (id <= N*(N-1));
+	bool vertical = (id <= N*(N-1));
 
 	switch (dir) {
 		case 0: // "North" direction, node 'id' necessarily horizontal
@@ -83,7 +83,7 @@ struct node* turn90(uint16_t id, uint8_t dir) {
 	nb[0].dir = (dir + 6) % 8;
 	nb[1].dir = (dir + 2) % 8;
 
-	_Bool vertical = (id <= N*(N-1));
+	bool vertical = (id <= N*(N-1));
 
 	switch (dir) {
 		case 0: // "North" direction, node 'id' necessarily horizontal
@@ -143,12 +143,13 @@ struct node* turn90(uint16_t id, uint8_t dir) {
 			nb[1].id = 0xffff; // 2^16 - 1
 
 	}
+	return nb;
 }
 
 
-_Bool node_at(uint16_t id) {
+bool node_at(uint16_t id, struct square *m) {
 	if (id > 2*N*(N-1))
-		return FALSE;
+		return false;
 
 	uint8_t i,j; 
 	if (id <= N * (N - 1)) { 
@@ -156,16 +157,16 @@ _Bool node_at(uint16_t id) {
 		i = id / (N - 1);
 		j = id % (N - 1);
 		//  0 if wall (node_at = false), 1 if none (node_at = true)
-		return trip.m[ N * i  + j].w[1]; // right wall
+		return m[ N * i  + j].w[1]; // right wall
 	}
 	// the potential node is on a horizontal edge
 	j = id / (N - 1);
 	i = id % (N - 1);
-	return trip.m[ N * i  + j].w[2]; // bottom wall
+	return m[ N * i  + j].w[2]; // bottom wall
 }
 
 void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip) {
-	*nbhrs.id = p->id; // (0th elem).id stores "root" node
+	nbhrs[0].id = p->id; // (0th elem).id stores "root" node
 	uint8_t n = 0;
 
 	// --====0---==--=-=-=--=====-------==--=------
@@ -179,17 +180,17 @@ void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip) {
 	// ? should we take start / end _squares_ instead of nodes?
 	
 	// straight ahead
-	while(node_at(just_ahead(nbhrs[n].id,p->dir))) {
+	while(node_at(just_ahead(nbhrs[n].id,p->dir),trip->m)) {
 		nbhrs[n+1].id = just_ahead(nbhrs[n].id,p->dir); 
 		nbhrs[++n].dir = p->dir;
 		nbhrs[n].time = p->time + time_straight(n, p, nbhrs[n-1]);
 	}
 
 	// --- 90deg turns ---
-	struct node nb[2];
+	struct node *nb;
 	nb = turn90(p->id,p->dir); 
 	for (int i = 0; i < 2; ++i) { // two possible 90deg turns given direction
-		if (node_at(nb[i].id)) {
+		if (node_at(nb[i].id,trip->m)) {
 			nbhrs[++n].id = nb[i].id;
 			nbhrs[n].dir = nb[i].dir;
 			nbhrs[n].time = p->time + TURN90_TIME;
@@ -197,13 +198,13 @@ void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip) {
 	}
 
 	// --- 45deg turns --- 
-	if (node_at(just_ahead(p->id,p->dir))) {
+	if (node_at(just_ahead(p->id,p->dir),trip->m)) {
 		nb = turn90(just_ahead(p->id,p->dir),p->dir);
-		if (p->id > N*(N-1) && node_at(nb[0].id)) { 
+		if (p->id > N*(N-1) && node_at(nb[0].id,trip->m)) { 
 			// starting node horizontal => only left 45 deg turn possible
 			nbhrs[++n].id = nb[0].id;
 			nbhrs[n].dir = (p->id + 7) % 8;
-		} else if (node_at(nb[1].id)) { 
+		} else if (node_at(nb[1].id,trip->m)) { 
 			// starting node vertical => only right 45 deg turn possible
 			nbhrs[++n].id = nb[1].id;
 			nbhrs[n].dir = (p->id + 1) % 8;
@@ -211,8 +212,8 @@ void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip) {
 		nbhrs[n].time = p->time + TURN45_TIME;
 	}
 
-	*nbhrs.time = n; // (0th elem).time stores # neighbors
-	return nbhrs;
+	nbhrs[0].time = n; // (0th elem).time stores # neighbors
+	return;
 }
 
 
@@ -224,27 +225,27 @@ struct node* hash(struct node nb, uint16_t end_id, struct node **tbl) {
 	return p;
 }
 
-uint16_t* trace_back(uint16_t *path, struct node **tbl, struct map *trip) {
-	struct node nb;
-	nb.id = trip->end_id;
-	nb.dir = 0; // necessary?
-	path[0] = 0; // counts # nodes in path
-	do {
-		// modify nb (?) see todo at top
-		path[++path[0]] = nb.id;
-		nb = hash(nb,trip->end_id,tbl)->pre;
-	} while (nb.id != trip->start_id);
-
-	path[++path[0]] = trip->start_id;
-	free(tbl);
-	return path;
-	// SOMEONE NEEDS TO FREE 'path'!
-}
+//uint16_t* trace_back(uint16_t *path, struct node **tbl, struct map *trip) {
+//	struct node *nb;
+//	nb->id = trip->end_id;
+//	nb->dir = 0; // necessary?
+//	path[0] = 0; // counts # nodes in path
+//	do {
+//		// modify nb (?) see todo at top
+//		path[++path[0]] = nb.id;
+//		nb = hash(nb,trip->end_id,tbl)->pre;
+//	} while (nb.id != trip->start_id);
+//
+//	path[++path[0]] = trip->start_id;
+//	free(tbl);
+//	return path;
+//	// SOMEONE NEEDS TO FREE 'path'!
+//}
 
 void update_tbl(struct node *nbhrs, struct node **tbl) {
 	uint16_t k;
 	struct node *c;
-	for (uint8_t i = 1; i <= *nbhrs.time; ++i) { 
+	for (uint8_t i = 1; i <= nbhrs[0].time; ++i) { 
 		k = nbhrs[i].id % HASH_SIZE;
 		c = tbl[k];
 		while (!(c->id == nbhrs[i].id && c->dir == nbhrs[i].dir)) {
@@ -260,7 +261,7 @@ void update_tbl(struct node *nbhrs, struct node **tbl) {
 		}
 		if (nbhrs[i].time < c->time) {
 			c->time = nbhrs[i].time;
-			c->pre = *nbhrs.id; // (1st elem).id stores current node
+			c->pre = nbhrs[0].id; // (1st elem).id stores current node
 		}
 	}
 	return;
@@ -270,7 +271,7 @@ uint16_t parent(uint16_t c) {
 	return ((c == 1) ? 1 : (c >> 1));
 }
 
-void update_heap(struct node *nbhrs, struct node **heap, struct map *trip, \ 
+void update_heap(struct node *nbhrs, struct node **heap, struct map *trip, \
 				 struct node **tbl) {
 	uint16_t nc, np; 
 	struct node *temp;
@@ -298,8 +299,8 @@ struct node** fastest_path(struct map *trip) {
 	trip->n_tbl = 0;
 	trip->n_heap = 0;
 //	struct node *heap[2 + HEAP_SIZE]; // 1-indexed + need temporary space at end
-	struct node **heap = malloc( HEAP_SIZE * typeof(struct node *)); 
-	struct node **tbl = malloc( HASH_SIZE * typeof(struct node *)); 
+	struct node **heap = malloc( HEAP_SIZE * sizeof(struct node *)); 
+	struct node **tbl = malloc( HASH_SIZE * sizeof(struct node *)); 
 	for (uint16_t i = 0; i < HASH_SIZE; ++i)
 		tbl[i] = NULL;
 
@@ -310,11 +311,11 @@ struct node** fastest_path(struct map *trip) {
 	// then alternating node id, 
 	// 		movement (straight n squares; 45, 90 left/right; turn in place)
 
-	*nbhrs.time = 1;
-	*nbhrs.id = 0xffff; // (not a valid node, since start has no previous node)
-	nbhrs[1]->id = trip->start_id;
-	nbhrs[1]->dir = trip->start_dir;
-	nbhrs[1]->time = 0;
+	nbhrs[0].time = 1;
+	nbhrs[0].id = 0xffff; // (not a valid node, since start has no previous node)
+	nbhrs[1].id = trip->start_id;
+	nbhrs[1].dir = trip->start_dir;
+	nbhrs[1].time = 0;
 	update_tbl(nbhrs,tbl);
 	heap[1] = hash(nbhrs[1],trip->end_id,tbl);
 
@@ -322,8 +323,8 @@ struct node** fastest_path(struct map *trip) {
 		pop(heap,tbl,trip);
 		get_nbhrs(heap[0],nbhrs,trip);
 		update_tbl(nbhrs,tbl);
-		update_heap(nbhrs,heap,tbl);
-	} while (heap[0] != trip->end_id); 
+		update_heap(nbhrs,heap,trip,tbl);
+	} while (heap[0]->id != trip->end_id); 
 
 	free(nbhrs);
 	free(heap);

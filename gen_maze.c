@@ -13,46 +13,9 @@ struct submaze { // could use 4-bitfields to save space
 	uint8_t c;
 };
 
-//void draw(struct square *m) 
-//{
-//	for (int i = 0; i < N; ++i) {
-//		/* top/bottom walls */
-//		for (int j = 0; j < N; ++j) {	
-//			printf("+");
-//			if (m[i * N + j].w[0])
-//				printf("--");
-//			else 
-//				printf("  ");
-//		}
-//		printf("+");
-//		printf("\n");
-//
-//		/* left/right walls */
-//		for (int j = 0; j < N; ++j) {	
-//			if (m[i * N + j].w[3])
-//				printf("|");
-//			else 
-//				printf(" ");
-//			printf("  ");
-//
-//			/* right outer wall */
-//			if (j == N - 1)
-//				printf("|");
-//		}
-//		printf("\n");
-//	}
-//
-//	/* bottom */
-//	for (int j = 0; j < N; ++j) {
-//		printf("+");
-//		printf("--");
-//	}
-//	printf("+");
-//	printf("\n");
-//}
-
-void draw(struct square *m) 
+void draw(struct square *m, struct node **tbl, struct map trip) 
 {
+
 	initscr();
 	int i = 0, j = 0;	// screen position 
 	int row = 0, col = 0; // maze position 
@@ -105,11 +68,48 @@ void draw(struct square *m)
 	mvprintw(i,j,"%s","+");
 //	mvprintw(i,j,"%s","\n");
 
+	// overlay fastest path
+	struct node *p = hash(trip.end_id);
+//struct node* hash(struct node nb, uint16_t end_id, struct node **tbl);
+	uint8_t ij[2];
+	do {
+		ij = id_to_draw_pos(p->id);
+		if (p->id > N*(N-1)) // horizontal
+			mvprintw(ij[0],ij[1],"%s","* ");
+		else // vertical
+			mvprintw(ij[0],ij[1],"%s","*");
+
+		p = p->pre;
+	} while (hash(p->pre)->id != trip.start_id);
+
 	refresh();
 	char c = getch();
 	if (c == 'q')
 		endwin();
 }
+
+uint8_t* id_to_draw_pos(uint16_t id) {
+//	if (id > 2*N*(N-1))
+	uint8_t ij[2];
+	uint8_t row,col; 
+
+	if (id <= N * (N - 1)) { 
+		// the potential node is on a vertical edge
+		row = id / (N - 1);
+		col = id % (N - 1);
+		ij[0] = 2 * row + 1;
+		ij[1] = 3 * col;
+	} else {
+	// the potential node is on a horizontal edge
+		col = id / (N - 1);
+		row = id % (N - 1);
+		ij[0] = 2 * row;
+		ij[1] = 3 * col + 1;
+	}
+	return ij;
+}
+
+
 
 void set_top_wall(struct submaze *s, uint8_t build, uint8_t row, uint8_t col)
 {
@@ -207,24 +207,24 @@ void gen_maze(struct submaze *s)
 		gen_maze(&t[i]);
 }
 
-struct map* itinerary(struct square* maze) {
-	struct map *trip;
-	trip->m = maze;
-	trip->n_tbl = 0;
-	trip->n_heap = 0;
+struct map itinerary(struct square* maze) {
+	struct map trip;
+	trip.m = maze;
+	trip.n_tbl = 0;
+	trip.n_heap = 0;
 
-	if (node_at(1)) {
-		trip->start_id = 1;
-		trip->start_dir = 1;
+	if (node_at(1,maze)) {
+		trip.start_id = 1;
+		trip.start_dir = 1;
 	} else {
-		trip->start_id = N*(N-1) + 1; // why not 0-index nodes? 
-		trip->start_dir = 2;
+		trip.start_id = N*(N-1) + 1; // why not 0-index nodes? 
+		trip.start_dir = 2;
 	}
 
-	if (node_at(N*(N-1))) {
-		trip->end_id = N*(N-1);
+	if (node_at(N*(N-1),maze)) {
+		trip.end_id = N*(N-1);
 	} else {
-		trip->end_id = 2*N*(N-1);
+		trip.end_id = 2*N*(N-1);
 	}
 	return trip;
 }
@@ -251,11 +251,13 @@ int main (int argc, char *argv[] ) {
 	/* build interior walls */
 	gen_maze(s);
 
-	/* draw in terminal */
-	printf("pencils are go...\n");
-	draw(maze);
+	/* find fastest path */
+	struct map trip = itinerary(s->m);
+	__attribute__((unused))
+	struct node **tbl = fastest_path(&trip);
 
-	struct map *trip = itinerary(s->m);
-	struct node **tbl = fastest_path(trip);
+	/* draw in terminal */
+	draw(maze,tbl);
+
 	return 0;
 }
