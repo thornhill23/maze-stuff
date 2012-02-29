@@ -1,41 +1,114 @@
-#include "gen_maze.h"
+#include <ncurses.h> // apparently -lncurses is necessary here as a gcc option
+#include "fastest_path.h"
+
+struct submaze { // could use 4-bitfields to save space
+	struct square *m; /* pointer to original maze */
+
+	/* row, column offsets from original pointer */
+	uint8_t i; 
+	uint8_t j; 
+
+	/*number of empty rows, cols in submaze avail. for wall placement */
+	uint8_t r;
+	uint8_t c;
+};
+
+//void draw(struct square *m) 
+//{
+//	for (int i = 0; i < N; ++i) {
+//		/* top/bottom walls */
+//		for (int j = 0; j < N; ++j) {	
+//			printf("+");
+//			if (m[i * N + j].w[0])
+//				printf("--");
+//			else 
+//				printf("  ");
+//		}
+//		printf("+");
+//		printf("\n");
+//
+//		/* left/right walls */
+//		for (int j = 0; j < N; ++j) {	
+//			if (m[i * N + j].w[3])
+//				printf("|");
+//			else 
+//				printf(" ");
+//			printf("  ");
+//
+//			/* right outer wall */
+//			if (j == N - 1)
+//				printf("|");
+//		}
+//		printf("\n");
+//	}
+//
+//	/* bottom */
+//	for (int j = 0; j < N; ++j) {
+//		printf("+");
+//		printf("--");
+//	}
+//	printf("+");
+//	printf("\n");
+//}
 
 void draw(struct square *m) 
 {
-	for (int i = 0; i < N; ++i) {
+	initscr();
+	int i = 0, j = 0;	// screen position 
+	int row = 0, col = 0; // maze position 
+	while(row < N) {
 		/* top/bottom walls */
-		for (int j = 0; j < N; ++j) {	
-			printf("+");
-			if (m[i * N + j].w[0])
-				printf("--");
-			else 
-				printf("  ");
+		while(col < N) {
+			mvprintw(i,j++,"%s","+");
+			if (m[row * N + col].w[0]) {
+				mvprintw(i,j,"%s","--");
+				j += 2;
+			} else {
+				mvprintw(i,j,"%s","  ");
+				j += 2;
+			}
+			++col;
 		}
-		printf("+");
-		printf("\n");
+		mvprintw(i,j++,"%s","+");
+//		mvprintw(i,j,"%s","\n"); 
+// 			^ unnecessary; unless we copy to file?
 
 		/* left/right walls */
-		for (int j = 0; j < N; ++j) {	
-			if (m[i * N + j].w[3])
-				printf("|");
+		col = 0;
+		++i;
+		j = 0;
+		while(col < N) {
+			if (m[row * N + col].w[3])
+				mvprintw(i,j++,"%s","|");
 			else 
-				printf(" ");
-			printf("  ");
-
-			/* right outer wall */
-			if (j == N - 1)
-				printf("|");
+				mvprintw(i,j++,"%s"," ");
+			mvprintw(i,j,"%s","  ");
+			j += 2;
+			++col;
 		}
-		printf("\n");
+		if (col == N)
+			mvprintw(i,j++,"%s","|");
+//		mvprintw(i,j,"%s","\n");
+		col = 0;
+		++i;
+		j = 0;
+		++row;
 	}
 
 	/* bottom */
-	for (int j = 0; j < N; ++j) {
-		printf("+");
-		printf("--");
+	while (col < N) {
+		mvprintw(i,j++,"%s","+");
+		mvprintw(i,j,"%s","--");
+		j += 2;
+		++col;
 	}
-	printf("+");
-	printf("\n");
+	mvprintw(i,j,"%s","+");
+//	mvprintw(i,j,"%s","\n");
+
+	refresh();
+	char c = getch();
+	if (c == 'q')
+		endwin();
 }
 
 void set_top_wall(struct submaze *s, uint8_t build, uint8_t row, uint8_t col)
@@ -88,8 +161,8 @@ void new_submaze(struct submaze *t, struct submaze *s, uint8_t vcut, uint8_t hcu
 	t[3].c = s->j + s->c - vcut;
 
 	/*	for (int i = 0; i < 4; ++i)
-		if (t[i].m[t[i].i * t[i].n + t[i].j].sqr == 0)
-		t[i].m[t[i].i * t[i].n + t[i].j].sqr = i + 1;
+		if (t[i].m[t[i].i * N + t[i].j].sqr == 0)
+		t[i].m[t[i].i * N + t[i].j].sqr = i + 1;
 	 */
 }
 
@@ -134,6 +207,29 @@ void gen_maze(struct submaze *s)
 		gen_maze(&t[i]);
 }
 
+struct map* itinerary(struct square* maze) {
+	struct map *trip;
+	trip->m = maze;
+	trip->n_tbl = 0;
+	trip->n_heap = 0;
+
+	if (node_at(1)) {
+		trip->start_id = 1;
+		trip->start_dir = 1;
+	} else {
+		trip->start_id = N*(N-1) + 1; // why not 0-index nodes? 
+		trip->start_dir = 2;
+	}
+
+	if (node_at(N*(N-1))) {
+		trip->end_id = N*(N-1);
+	} else {
+		trip->end_id = 2*N*(N-1);
+	}
+	return trip;
+}
+			
+
 int main (int argc, char *argv[] ) {
 	srand(atoi(argv[1]));
 	struct square maze[N * N] = {};
@@ -156,7 +252,10 @@ int main (int argc, char *argv[] ) {
 	gen_maze(s);
 
 	/* draw in terminal */
+	printf("pencils are go...\n");
 	draw(maze);
 
-	return(0);
+	struct map *trip = itinerary(s->m);
+	struct node **tbl = fastest_path(trip);
+	return 0;
 }
