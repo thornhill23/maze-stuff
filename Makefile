@@ -24,7 +24,7 @@ maze-test : LDFLAGS += -lncurses
 
 .PHONY: clean
 clean :
-	$(RM) *.[oda]
+	$(RM) *.[oda] maze-test
 
 .SECONDARY:
 %.o : %.c

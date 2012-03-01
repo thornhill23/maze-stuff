@@ -240,6 +240,12 @@ struct map itinerary(struct square* maze) {
 			
 
 int main (int argc, char *argv[] ) {
+	if (argc != 2) {
+		fprintf(stderr, "usage: %s <arg>\n", argc?argv[0]:"maze-test");
+		return 1;
+	}
+
+
 	srand(atoi(argv[1]));
 	struct square maze[N * N] = {};
 	struct submaze s_, *s = &s_;
