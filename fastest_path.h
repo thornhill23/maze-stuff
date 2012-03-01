@@ -1,9 +1,12 @@
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
 
+#ifndef FASTEST_PATH
+#define FASTEST_PATH
 
 #define N 4 // maze is size N x N
 
@@ -27,13 +30,12 @@
 //		uint16_t time;
 //	}
 
-#ifndef FASTEST_PATH
-#define FASTEST_PATH
 struct node {
-	uint16_t pre;
 	uint16_t time;
 	uint16_t id; // together, id and dir uniquely identify a node
-	uint8_t dir; //		in the graph.
+	uint16_t pre_id;
+	uint8_t dir; 
+	uint8_t pre_dir;
 	/*		0
 	 *	7		1 
 	 * 6   		 2
@@ -74,7 +76,7 @@ struct node* turn90(uint16_t id, uint8_t dir);
 bool node_at(uint16_t id, struct square *m);
 void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip);
 
-struct node* hash(struct node nb, uint16_t end_id, struct node **tbl);
+struct node* hash(struct node* nb, uint16_t end_id, struct node **tbl);
 void update_tbl(struct node *nbhrs, struct node **tbl);
 
 void update_heap(struct node *nbhrs, struct node **heap, struct map *trip, \

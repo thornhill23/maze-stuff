@@ -4,7 +4,8 @@
 // 2. figure out what the fastest path output looks like.
 // 		(node movement node movement) or (node n ... n, movement m .. m) ?
 // 3. wrt turning on a dime: different angles possible (45 90 180) (if at dead end) 
-// 4. nbhr problem:
+// 4. 'nbhrs' issue?:
+// [0]			[1]		[2]		[3]
 // orig_id		id1		id2		id3	
 // num_id's		time1	time2	time3			
 
@@ -217,9 +218,9 @@ void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip) {
 }
 
 
-struct node* hash(struct node nb, uint16_t end_id, struct node **tbl) {
-	struct node *p = tbl[nb.id];
-	while (p->id != nb.id && (p->dir != nb.dir || p->id == end_id))
+struct node* hash(struct node *nb, uint16_t end_id, struct node **tbl) {
+	struct node *p = tbl[nb->id];
+	while (p->id != nb->id && (p->dir != nb->dir || p->id == end_id))
 		p = p->nxt_in_tbl; 
 	// safe if node is in table
 	return p;
@@ -244,10 +245,11 @@ struct node* hash(struct node nb, uint16_t end_id, struct node **tbl) {
 
 void update_tbl(struct node *nbhrs, struct node **tbl) {
 	uint16_t k;
-	struct node *c;
+	struct node *c = malloc(sizeof(struct node));
 	for (uint8_t i = 1; i <= nbhrs[0].time; ++i) { 
 		k = nbhrs[i].id % HASH_SIZE;
 		c = tbl[k];
+		// problem: seg fault 
 		while (!(c->id == nbhrs[i].id && c->dir == nbhrs[i].dir)) {
 			if (c == NULL) { // initialize node
 				c = malloc(sizeof(struct node*));
@@ -261,9 +263,11 @@ void update_tbl(struct node *nbhrs, struct node **tbl) {
 		}
 		if (nbhrs[i].time < c->time) {
 			c->time = nbhrs[i].time;
-			c->pre = nbhrs[0].id; // (1st elem).id stores current node
+			c->pre_id = nbhrs[0].id; // (0th elem).id stores current node
+			c->pre_dir = nbhrs[0].dir; // (0th elem).id stores current node
 		}
 	}
+	free(c);
 	return;
 }
 
@@ -277,7 +281,7 @@ void update_heap(struct node *nbhrs, struct node **heap, struct map *trip, \
 	struct node *temp;
 	for (int8_t i = 1; i <= nbhrs[0].id; ++i) { 
 		nc = ++trip->n_heap;
-		heap[nc] = hash(nbhrs[i],trip->end_id,tbl); // heap(nc), heap(np) ; not nc, np in the following ??
+		heap[nc] = hash(&nbhrs[i],trip->end_id,tbl); // heap(nc), heap(np) ; not nc, np in the following ??
 		np = parent(nc);
 		while (heap[np]->time > heap[nc]->time) {
 			// switch node ID (hash key) positions in the heap.
@@ -306,18 +310,14 @@ struct node** fastest_path(struct map *trip) {
 
 	// 7 + N is approx max possible number of connected nodes (neighbors)
 	struct node *nbhrs = malloc( (7 + N) * sizeof(struct node *)); 
-	// uint16_t *path = malloc( 8 * N * typeof(uint16_t));
-	// path[0] = # nodes in path
-	// then alternating node id, 
-	// 		movement (straight n squares; 45, 90 left/right; turn in place)
-
+	// problem spot
 	nbhrs[0].time = 1;
 	nbhrs[0].id = 0xffff; // (not a valid node, since start has no previous node)
 	nbhrs[1].id = trip->start_id;
 	nbhrs[1].dir = trip->start_dir;
 	nbhrs[1].time = 0;
 	update_tbl(nbhrs,tbl);
-	heap[1] = hash(nbhrs[1],trip->end_id,tbl);
+	heap[1] = hash(&nbhrs[1],trip->end_id,tbl);
 
 	do {
 		pop(heap,tbl,trip);
