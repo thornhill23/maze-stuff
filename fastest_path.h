@@ -72,7 +72,6 @@ struct map {
 void pop(struct node **heap, struct node **tbl, struct map *trip);
 uint16_t time_straight(uint16_t n, struct node *p, struct node nb);
 uint16_t just_ahead(uint16_t id, uint8_t dir);
-struct node* turn90(uint16_t id, uint8_t dir);
 bool node_at(uint16_t id, struct square *m);
 void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip);
 
