@@ -13,23 +13,27 @@ struct submaze { // could use 4-bitfields to save space
 	uint8_t c;
 };
 
-uint8_t* id_to_draw_pos(uint16_t id) {
+struct pos {
+	uint8_t i;
+	uint8_t j;
+};
+struct pos id_to_draw_pos(uint16_t id) {
 //	if (id > 2*N*(N-1))
-	uint8_t ij[2];
+	struct pos ij;
 	uint8_t row,col; 
 
 	if (id <= N * (N - 1)) { 
 		// the potential node is on a vertical edge
 		row = id / (N - 1);
 		col = id % (N - 1);
-		ij[0] = 2 * row + 1;
-		ij[1] = 3 * col;
+		ij.i = 2 * row + 1;
+		ij.j = 3 * col;
 	} else {
 	// the potential node is on a horizontal edge
 		col = id / (N - 1);
 		row = id % (N - 1);
-		ij[0] = 2 * row;
-		ij[1] = 3 * col + 1;
+		ij.i = 2 * row;
+		ij.j = 3 * col + 1;
 	}
 	return ij;
 }
@@ -90,7 +94,7 @@ void draw(struct square *m, struct node **tbl, struct map trip)
 //	mvprintw(i,j,"%s","\n");
 
 	// overlay fastest path
-	uint8_t *ij = malloc(2 * sizeof(uint8_t));
+	struct pos ij;
 	struct node *nb = malloc(sizeof(struct node));
 	nb->pre_id = trip.end_id;
 	nb->pre_dir = 8; // irrelevant; 8 not a valid direct
@@ -100,9 +104,9 @@ void draw(struct square *m, struct node **tbl, struct map trip)
 		nb = hash(nb, trip.end_id, tbl);
 		ij = id_to_draw_pos(nb->id);
 		if (nb->id > N*(N-1)) // horizontal
-			mvprintw(ij[0],ij[1],"%s","* ");
+			mvprintw(ij.i,ij.j,"%s","* ");
 		else // vertical
-			mvprintw(ij[0],ij[1],"%s","*");
+			mvprintw(ij.i,ij.j,"%s","*");
 	} while (nb->id != trip.start_id);
 
 	refresh();
@@ -110,7 +114,6 @@ void draw(struct square *m, struct node **tbl, struct map trip)
 	if (c == 'q')
 		endwin();
 	free(nb);
-	free(ij);
 	return;
 }
 
@@ -237,6 +240,12 @@ struct map itinerary(struct square* maze) {
 			
 
 int main (int argc, char *argv[] ) {
+	if (argc != 2) {
+		fprintf(stderr, "usage: %s <arg>\n", argc?argv[0]:"maze-test");
+		return 1;
+	}
+
+
 	srand(atoi(argv[1]));
 	struct square maze[N * N] = {};
 	struct submaze s_, *s = &s_;

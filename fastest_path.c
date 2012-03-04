@@ -78,70 +78,73 @@ uint16_t just_ahead(uint16_t id, uint8_t dir) {
 	}
 }
 
-struct node* turn90(uint16_t id, uint8_t dir) {
-	struct node nb[3]; // nb[0] relative left
+struct node2 {
+	struct node n[2];
+};
+struct node2 turn90(uint16_t id, uint8_t dir) {
+	struct node2 nb; // nb[0] relative left
    					   // nb[1] relative right
-	nb[0].dir = (dir + 6) % 8;
-	nb[1].dir = (dir + 2) % 8;
+	nb.n[0].dir = (dir + 6) % 8;
+	nb.n[1].dir = (dir + 2) % 8;
 
 	bool vertical = (id <= N*(N-1));
 
 	switch (dir) {
 		case 0: // "North" direction, node 'id' necessarily horizontal
-			nb[0].id  = HORIZ_TO_VERT(id) - 1;
-			nb[1].id  = HORIZ_TO_VERT(id);
+			nb.n[0].id  = HORIZ_TO_VERT(id) - 1;
+			nb.n[1].id  = HORIZ_TO_VERT(id);
 			break;
 		case 4: // South, necessarily horizontal
-			nb[0].id  = HORIZ_TO_VERT(id+1);
-			nb[1].id  = HORIZ_TO_VERT(id+1) - 1;
+			nb.n[0].id  = HORIZ_TO_VERT(id+1);
+			nb.n[1].id  = HORIZ_TO_VERT(id+1) - 1;
 			break;
 		case 2: // E, necessarily vertical 
-			nb[0].id  = VERT_TO_HORIZ(id+1) - 1;
-			nb[1].id  = VERT_TO_HORIZ(id+1);
+			nb.n[0].id  = VERT_TO_HORIZ(id+1) - 1;
+			nb.n[1].id  = VERT_TO_HORIZ(id+1);
 			break;
 		case 6: // W, necessarily vertical 
-			nb[0].id  = VERT_TO_HORIZ(id);
-			nb[1].id  = VERT_TO_HORIZ(id) - 1;
+			nb.n[0].id  = VERT_TO_HORIZ(id);
+			nb.n[1].id  = VERT_TO_HORIZ(id) - 1;
 			break;
 		case 1: // NE
 			if (vertical)  {
-				nb[0].id = id - (N-1);
-				nb[1].id = id +1;
+				nb.n[0].id = id - (N-1);
+				nb.n[1].id = id +1;
 			} else {
-				nb[0].id = id - 1;
-				nb[1].id = id + N-1;
+				nb.n[0].id = id - 1;
+				nb.n[1].id = id + N-1;
 			}
 			break;
 		case 3: // SE
 			if (vertical) {
-				nb[0].id = id + 1;
-				nb[1].id = id + N-1;
+				nb.n[0].id = id + 1;
+				nb.n[1].id = id + N-1;
 			} else {
-				nb[0].id = id + N-1;
-				nb[1].id = id + 1;
+				nb.n[0].id = id + N-1;
+				nb.n[1].id = id + 1;
 			}
 			break;
 		case 5: // SW
 			if (vertical) {
-				nb[0].id = id + 1;
-				nb[1].id = id -(N-1);
+				nb.n[0].id = id + 1;
+				nb.n[1].id = id -(N-1);
 			} else {
-				nb[0].id = id + N-1;
-				nb[1].id = id - 1;
+				nb.n[0].id = id + N-1;
+				nb.n[1].id = id - 1;
 			}
 			break;
 		case 7: // NW
 			if (vertical) {
-				nb[0].id = id - 1;
-				nb[1].id = id - (N-1);
+				nb.n[0].id = id - 1;
+				nb.n[1].id = id - (N-1);
 			} else {
-				nb[0].id = id - (N-1);
-				nb[1].id = id - 1;
+				nb.n[0].id = id - (N-1);
+				nb.n[1].id = id - 1;
 			}
 			break;
 		default: // returns an invalid node id
-			nb[0].id = 0xffff; // 2^16 - 1
-			nb[1].id = 0xffff; // 2^16 - 1
+			nb.n[0].id = 0xffff; // 2^16 - 1
+			nb.n[1].id = 0xffff; // 2^16 - 1
 
 	}
 	return nb;
@@ -188,8 +191,9 @@ void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip) {
 	}
 
 	// --- 90deg turns ---
-	struct node *nb;
-	nb = turn90(p->id,p->dir); 
+	struct node2 _nb;
+	struct node *nb = _nb.n;
+	_nb = turn90(p->id,p->dir);
 	for (int i = 0; i < 2; ++i) { // two possible 90deg turns given direction
 		if (node_at(nb[i].id,trip->m)) {
 			nbhrs[++n].id = nb[i].id;
@@ -200,7 +204,7 @@ void get_nbhrs(struct node *p, struct node *nbhrs, struct map *trip) {
 
 	// --- 45deg turns --- 
 	if (node_at(just_ahead(p->id,p->dir),trip->m)) {
-		nb = turn90(just_ahead(p->id,p->dir),p->dir);
+		_nb = turn90(just_ahead(p->id,p->dir),p->dir);
 		if (p->id > N*(N-1) && node_at(nb[0].id,trip->m)) { 
 			// starting node horizontal => only left 45 deg turn possible
 			nbhrs[++n].id = nb[0].id;
@@ -298,7 +302,6 @@ void update_heap(struct node *nbhrs, struct node **heap, struct map *trip, \
 	}
 	return;
 }
-
 
 struct node** fastest_path(struct map *trip) {
 	trip->n_tbl = 0;
