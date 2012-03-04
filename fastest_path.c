@@ -252,7 +252,8 @@ void update_tbl(struct node *nbhrs, struct node **tbl) {
 		// problem: seg fault 
 		while (!(c->id == nbhrs[i].id && c->dir == nbhrs[i].dir)) {
 			if (c == NULL) { // initialize node
-				c = malloc(sizeof(struct node*));
+				// what is going on here?
+				*c = malloc(sizeof(struct node));
 				c->id  = nbhrs[i].id; 
 				c->dir  = nbhrs[i].dir; 
 				c->time = nbhrs[i].time; 
