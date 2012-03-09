@@ -37,12 +37,12 @@ struct node {
 };
 
 struct heap {
-	struct node *h[HEAP_SIZE]; // or *node h[]?
+	struct node* h[HEAP_SIZE]; // or *node h[]?
 	uint16_t n_heap; // current number of nodes in heap 
 };
 
 struct tbl {
-	struct node *t[HASH_SIZE];
+	struct node* t[HASH_SIZE];
 	uint16_t n_tbl;  // current number of nodes in hash table
 };
 
@@ -87,6 +87,6 @@ void update_heap(struct nbhs *nbhs, struct heap *heap, struct maze *maze, \
 uint16_t parent(uint16_t c);
 uint16_t child(uint16_t p);
 //uint16_t* trace_back(uint16_t *path, struct tbl tbl, struct maze *maze);
-struct tbl* fastest_path(struct maze *maze);
+void fastest_path(struct maze *maze, struct tbl *tbl);
 
 #endif 

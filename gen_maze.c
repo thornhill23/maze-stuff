@@ -38,7 +38,7 @@ struct pos id_to_draw_pos(uint16_t id) {
 	return ij;
 }
 
-void draw(struct square *m, struct tbl *tbl, struct maze maze) 
+void draw(struct square *m, struct tbl *tbl, struct maze *maze) 
 {
 
 	initscr();
@@ -96,7 +96,7 @@ void draw(struct square *m, struct tbl *tbl, struct maze maze)
 	// overlay fastest path
 	struct pos ij;
 	struct node *nb = malloc(sizeof(struct node));
-	nb->pre = maze.end_id;
+	nb->pre = maze->end_id;
 	do {
 		nb->id = nb->pre;
 		nb = hash(nb, tbl);
@@ -105,7 +105,7 @@ void draw(struct square *m, struct tbl *tbl, struct maze maze)
 			mvprintw(ij.i,ij.j,"%s","* ");
 		else // vertical
 			mvprintw(ij.i,ij.j,"%s","*");
-	} while (nb->id != maze.start_id);
+	} while (nb->id != maze->start_id);
 
 	refresh();
 	char c = getch();
@@ -222,21 +222,20 @@ void gen_maze(struct submaze *s)
 		gen_maze(&t[i]);
 }
 
-struct maze itinerary(struct square* m) {
-	struct maze maze;
-	maze.m = m;
+void itinerary(struct square *m,struct maze *maze) {
+	maze->m = m;
 
 	if (node_at(1,m))
-		maze.start_id = 1;
+		maze->start_id = 1;
 	else
-		maze.start_id = N*(N-1) + 1; // why not 0-index nodes? 
+		maze->start_id = N*(N-1) + 1; // why not 0-index nodes? 
 
 	if (node_at(N*(N-1),m)) 
-		maze.end_id = N*(N-1);
+		maze->end_id = N*(N-1);
 	else
-		maze.end_id = 2*N*(N-1);
+		maze->end_id = 2*N*(N-1);
 
-	return maze;
+	return;
 }
 			
 
@@ -245,7 +244,6 @@ int main (int argc, char *argv[] ) {
 		fprintf(stderr, "usage: %s <arg>\n", argc?argv[0]:"maze-test");
 		return 1;
 	}
-
 
 	srand(atoi(argv[1]));
 	struct square mz[N * N] = {};
@@ -256,16 +254,14 @@ int main (int argc, char *argv[] ) {
 	s->r = N-1;
 	s->c = N-1;
 
-
-	/* build interior walls */
 	gen_maze(s);
 
-	/* find fastest path */
-	struct maze maze = itinerary(s->m);
-	__attribute__((unused))
-	struct tbl *tbl = fastest_path(&maze);
+	struct maze maze; 
+	itinerary(s->m,&maze);
 
-	/* draw in terminal */
-	draw(s->m,tbl,maze);
+	struct tbl tbl; 
+	fastest_path(&maze,&tbl);
+
+	draw(s->m,&tbl,&maze);
 	return 0;
 }

@@ -20,8 +20,8 @@ void pop(struct heap *heap, struct tbl *tbl, struct maze *maze) {
 	heap->h[0] = heap->h[1]; // h[0] is "popped" 
 	uint16_t p = 1; // parent
 	uint16_t c = 2; // child
-	uint16_t c_min; // child with lowest time
-	while (c + 1 < heap->n_heap) {
+	uint16_t c_min = 1; // child with lowest time
+	while (c + 1 <= heap->n_heap) {
 		c_min = ((heap->h[c])->time < (heap->h[c + 1])->time) ? c : c + 1;
 		heap->h[p] = heap->h[c_min];
 		p = c_min;
@@ -82,21 +82,22 @@ bool node_at(uint16_t id, struct square *m) {
 		return false;
 
 	uint8_t i,j; 
-	if (id <= N * (N - 1)) { 
+	if (id <= N*(N-1)) { 
 		// the potential node is on a vertical edge
-		i = id / (N - 1);
-		j = id % (N - 1);
+		i = id / N; 
+		j = id % N;
 		//  0 if wall (node_at = false), 1 if none (node_at = true)
 		return m[ N * i  + j].w[1]; // right wall
 	}
 	// the potential node is on a horizontal edge
-	j = id / (N - 1);
-	i = id % (N - 1);
+	j = id / N;
+	i = id % N;
 	return m[ N * i  + j].w[2]; // bottom wall
 }
 
 void get_nbhs(struct node *p, struct nbhs *nbhs, struct maze *maze) {
 	// p is the popped node
+	printf("get_nbhrs: popped id =%u\n",p->id);
 	nbhs->n[0].id = p->id; // 0th elem stores "root" node
 	nbhs->n[0].time = p->time; 
 	nbhs->n_nbhs = 0; // n_nbhs tracks number of neighbors stored
@@ -115,30 +116,22 @@ void get_nbhs(struct node *p, struct nbhs *nbhs, struct maze *maze) {
 }
 
 
-struct node* hash(struct node *nb, struct tbl *tbl) {
-	struct node *p = tbl->t[nb->id % HASH_SIZE]; // + 1 ?
-	while (p->id != nb->id)
-		p = p->nxt_in_tbl; 
+struct node* hash(struct node *nd, struct tbl *tbl) {
+	struct node *p;
+	printf("hash: nd->id=%u\n",nd->id % HASH_SIZE);
+    p = tbl->t[nd->id % HASH_SIZE];
+	printf("nxt_in_tbl=NULL? %d\n",(p->nxt_in_tbl==NULL) ? 1:0);
+	while (p != NULL) {
+		if (p->id == nd->id) break;
+		else p = p->nxt_in_tbl;
+	}
 	// if node not in table, returns NULL
+	if (p != NULL)
+		printf("hash: returned p->id= %u\n",p->id);
+	else 
+		printf("hash: returning NULL\n");
 	return p;
 }
-
-//uint16_t* trace_back(uint16_t *path, struct node **tbl, struct maze *maze) {
-//	struct node *nb;
-//	nb->id = maze->end_id;
-//	nb->dir = 0; // necessary?
-//	path[0] = 0; // counts # nodes in path
-//	do {
-//		// modify nb (?) see todo at top
-//		path[++path[0]] = nb.id;
-//		nb = hash(nb,maze->end_id,tbl)->pre;
-//	} while (nb.id != maze->start_id);
-//
-//	path[++path[0]] = maze->start_id;
-//	free(tbl);
-//	return path;
-//	// SOMEONE NEEDS TO FREE 'path'!
-//}
 
 void update_tbl(struct nbhs *nbhs, struct tbl *tbl) {
 	uint16_t k; // hash table index
@@ -146,7 +139,17 @@ void update_tbl(struct nbhs *nbhs, struct tbl *tbl) {
 	bool added = false;
 	for (uint8_t i = 1; i <= nbhs->n_nbhs; ++i) { 
 		k = nbhs->n[i].id % HASH_SIZE;
+		printf("update_tbl: index = %u\n",k);
 		c = tbl->t[k];
+		if (c == NULL) {
+			c = malloc(sizeof(struct node));
+			c->id = nbhs->n[i].id;
+			c->time = nbhs->n[i].time;
+			c->pre = nbhs->n[0].id;
+			c->nxt_in_tbl = NULL;
+			tbl->t[k] = c;
+		}
+
 		while (c != NULL) {
 			if (c->id == nbhs->n[i].id) {
 				if (nbhs->n[i].time < c->time) {
@@ -183,6 +186,10 @@ void update_heap(struct nbhs *nbhs, struct heap *heap, struct maze *maze, \
 	for (int8_t i = 1; i <= nbhs->n_nbhs; ++i) { 
 		nc = ++heap->n_heap;
 		heap->h[nc] = hash(&(nbhs->n[i]),tbl);
+		if (heap->h[nc] != NULL)
+			printf("hash: returned p->id= %u\n",heap->h[nc]->id);
+		else 
+			printf("hash: returning NULL\n");
 		np = parent(nc);
 		while (heap->h[np]->time > heap->h[nc]->time) {
 			// switch node ID (hash key) positions in the heap
@@ -199,32 +206,34 @@ void update_heap(struct nbhs *nbhs, struct heap *heap, struct maze *maze, \
 	return;
 }
 
-static struct tbl  *tbl; 
-struct tbl* fastest_path(struct maze *maze) {
+void fastest_path(struct maze *maze, struct tbl *tbl) {
 	tbl->n_tbl = 0;
-	static struct heap *heap; 
-	heap->n_heap = 0;
-//	struct node *heap->h[2 + HEAP_SIZE]; // 1-indexed + need temporary space at end
 	for (uint16_t i = 0; i < HASH_SIZE; ++i)
 		tbl->t[i] = NULL;
 
-	static struct nbhs *nbhs;
+	struct heap *heap = malloc(sizeof(struct heap)); 
+
+	struct nbhs *nbhs = malloc(sizeof(struct nbhs)); 
 	nbhs->n_nbhs = 1;
-	nbhs->n[0].id = 0xffff; // (not a valid node, since start has no previous node)
+	nbhs->n[0].id = 0xffff; // (invalid node, since start has no previous node)
 	nbhs->n[0].time = 87; //irrelevant, won't be used
 	nbhs->n[1].id = maze->start_id;
 	nbhs->n[1].time = 0;
 
 	update_tbl(nbhs,tbl);
 	heap->h[1] = hash(&(nbhs->n[1]),tbl);
+	heap->n_heap = 1;
 
 	do {
 		pop(heap,tbl,maze);
 		get_nbhs(heap->h[0],nbhs,maze);
+		printf("nnb=%u\n",nbhs->n_nbhs);
 		update_tbl(nbhs,tbl);
 		update_heap(nbhs,heap,maze,tbl);
+		printf("nhp=%u\n",heap->n_heap);
 	} while (heap->h[0]->id != maze->end_id); 
 
-	return tbl;
-	// someone needs to free this at the receiving end.
+	free(heap);
+	free(nbhs);
+	return;
 }
