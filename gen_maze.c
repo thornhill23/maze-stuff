@@ -38,7 +38,7 @@ struct pos id_to_draw_pos(uint16_t id) {
 	return ij;
 }
 
-void draw(struct square *m, struct node **tbl, struct map trip) 
+void draw(struct square *m, struct tbl *tbl, struct maze maze) 
 {
 
 	initscr();
@@ -96,18 +96,16 @@ void draw(struct square *m, struct node **tbl, struct map trip)
 	// overlay fastest path
 	struct pos ij;
 	struct node *nb = malloc(sizeof(struct node));
-	nb->pre_id = trip.end_id;
-	nb->pre_dir = 8; // irrelevant; 8 not a valid direct
+	nb->pre = maze.end_id;
 	do {
-		nb->id = nb->pre_id;
-		nb->dir = nb->pre_dir;
-		nb = hash(nb, trip.end_id, tbl);
+		nb->id = nb->pre;
+		nb = hash(nb, tbl);
 		ij = id_to_draw_pos(nb->id);
 		if (nb->id > N*(N-1)) // horizontal
 			mvprintw(ij.i,ij.j,"%s","* ");
 		else // vertical
 			mvprintw(ij.i,ij.j,"%s","*");
-	} while (nb->id != trip.start_id);
+	} while (nb->id != maze.start_id);
 
 	refresh();
 	char c = getch();
@@ -180,6 +178,14 @@ void gen_maze(struct submaze *s)
 	if ( s->r == 0 || s->c == 0)
 		return;
 
+	/* build exterior walls */
+	for (int k = 0; k < N; ++k) {
+		s->m[k].w[0] 		= 1;
+		s->m[(N - 1) * N + k].w[2] = 1; 
+		s->m[k * N].w[3]		= 1;
+		s->m[k * N + N - 1].w[1]   = 1;
+	}
+
 	uint8_t hcut = 1 + (rand() % s->r) + s->i;
 	uint8_t vcut = 1 + (rand() % s->c) + s->j;
 
@@ -216,26 +222,21 @@ void gen_maze(struct submaze *s)
 		gen_maze(&t[i]);
 }
 
-struct map itinerary(struct square* maze) {
-	struct map trip;
-	trip.m = maze;
-	trip.n_tbl = 0;
-	trip.n_heap = 0;
+struct maze itinerary(struct square* m) {
+	struct maze maze;
+	maze.m = m;
 
-	if (node_at(1,maze)) {
-		trip.start_id = 1;
-		trip.start_dir = 2;
-	} else {
-		trip.start_id = N*(N-1) + 1; // why not 0-index nodes? 
-		trip.start_dir = 4;
-	}
+	if (node_at(1,m))
+		maze.start_id = 1;
+	else
+		maze.start_id = N*(N-1) + 1; // why not 0-index nodes? 
 
-	if (node_at(N*(N-1),maze)) {
-		trip.end_id = N*(N-1);
-	} else {
-		trip.end_id = 2*N*(N-1);
-	}
-	return trip;
+	if (node_at(N*(N-1),m)) 
+		maze.end_id = N*(N-1);
+	else
+		maze.end_id = 2*N*(N-1);
+
+	return maze;
 }
 			
 
@@ -247,33 +248,24 @@ int main (int argc, char *argv[] ) {
 
 
 	srand(atoi(argv[1]));
-	struct square maze[N * N] = {};
+	struct square mz[N * N] = {};
 	struct submaze s_, *s = &s_;
-	s->m = maze;
+	s->m = mz;
 	s->i = 0;
 	s->j = 0;
 	s->r = N-1;
 	s->c = N-1;
 
-	/* build exterior walls */
-	for (int k = 0; k < N; ++k) {
-		s->m[k].w[0] 		= 1;
-		s->m[(N - 1) * N + k].w[2] = 1; 
-		s->m[k * N].w[3]		= 1;
-		s->m[k * N + N - 1].w[1]   = 1;
-	}
 
 	/* build interior walls */
 	gen_maze(s);
 
 	/* find fastest path */
-	struct map trip = itinerary(s->m);
+	struct maze maze = itinerary(s->m);
 	__attribute__((unused))
-	struct node **tbl = fastest_path(&trip);
+	struct tbl *tbl = fastest_path(&maze);
 
 	/* draw in terminal */
-	draw(maze,tbl,trip);
-	free(tbl);
-
+	draw(s->m,tbl,maze);
 	return 0;
 }
